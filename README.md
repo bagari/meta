@@ -17,7 +17,7 @@ MeTA is a workflow implemented to minimize microstructural heterogeneity in diff
 
 If you use MeTA code, please cite the following publication:
 * [Ba Gari, I., et al.: Heritability and Genetic Correlations Along the Corticospinal Tract. International Workshop on Computational Diffusion MRI. Cham: Springer Nature Morocco, 2024](https://doi.org/10.1007/978-3-031-86920-4_18)
-* [Ba Gari, I., et al.: Medial tractography analysis (MeTA) for white matter population analyses across datasets. In: 2023 11th International IEEE/EMBS Conference on Neural Engineering (NER). pp. 1–5 (Apr 2023)](https://doi.org/10.1109/NER52421.2023.10123727)
+* [Ba Gari, I., et al.: Along-tract parameterization of white matter microstructure using medial tractography analysis (MeTA). In: The 19th International Symposium on Medical Information Processing and Analysis (2023)](https://doi.org/10.1109/SIPAIM56729.2023.10373540)
 
 ## Installation
 
