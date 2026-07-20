@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
+requires = ["setuptools>=77.0.3"]
 
 [project]
-name = "meta"
-version = "2.0.1"
+name = "meta-neuro"
+version = "2.1.0"
 authors = [
   { name = "Iyad Ba Gari", email = "iyad.bagari@usc.edu" },
 ]
@@ -15,8 +15,9 @@ maintainers = [
 
 description = "Medial Tractography Analysis (MeTA) for along-tract analysis of white matter bundles"
 readme = "README.md"
-license = { file = "LICENSE.txt" }
-requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE.txt"]
+requires-python = ">=3.11,<3.14"
 
 keywords = [
   "Diffusion MRI",
@@ -29,23 +30,45 @@ keywords = [
 
 classifiers = [
     "Intended Audience :: Science/Research",
-    "Programming Language :: Python :: 3",
-    "Operating System :: Unix"
+    'Programming Language :: Python :: 3',
+    'Programming Language :: Python :: 3.11',
+    'Programming Language :: Python :: 3.12',
+    'Programming Language :: Python :: 3.13',
+    'Topic :: Scientific/Engineering',
+    'Operating System :: Microsoft :: Windows',
+    'Operating System :: POSIX',
+    'Operating System :: MacOS',
+]
+
+dependencies = [
+    "numpy",
+    "scipy",
+    "pandas",
+    "nibabel",
+    "dipy",
+    "tslearn",
+    "tqdm",
+    "pyvista",
+    "trx-python",
+    "tables",
 ]
 
 [project.urls]
 Repository = "https://github.com/bagari/meta"
 
 [project.scripts]
-meta = "meta.workflows.meta:run_main"
+meta = "meta.workflows.meta:main"
 density_map = "meta.core.density:density_map"
 shape_metrics = "meta.metrics.shape:shape_features"
 volumetric_profile = "meta.metrics.profile:volumetric_profile"
 streamlines_profile = "meta.metrics.profile:streamlines_profile"
+compute_bundle_similarity = "meta.metrics.compute_bundle_similarity:main"
+apply_transform_image = "meta.transforms.image:apply_transform_image"
+apply_transform_tractogram = "meta.transforms.tractogram:apply_transform_tractogram"
 
 [tool.setuptools.package-data]
 meta = ["*.yaml"]
 
 [tool.setuptools.packages.find]
 include = ["meta*"]
-exclude = ["src*", "environment*", "CMakeLists*", "resources*"]
+
