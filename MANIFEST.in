@@ -1,0 +1,5 @@
+exclude meta.yaml
+prune resources
+global-exclude .DS_Store
+global-exclude *.py[cod]
+global-exclude __pycache__
