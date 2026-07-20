@@ -8,7 +8,7 @@
 ## Medial Tractography Analysis (MeTA)
 
 <p align="center">
-<img width="800" alt="workflow" src="https://github.com/bagari/meta/blob/main/resources/MeTA_workflow.png">
+<img width="800" alt="workflow" src="https://raw.githubusercontent.com/bagari/meta/main/resources/MeTA_workflow.png">
 </p>
 
 MeTA is a workflow implemented to minimize microstructural heterogeneity in diffusion MRI (dMRI) metrics by extracting and parcellating the core volume along the bundle length in the voxel-space directly while effectively preserving bundle shape and efficiently capturing the regional variation within and along white matter (WM) bundles.
