@@ -19,83 +19,50 @@ If you use MeTA code, please cite the following publication:
 * [Ba Gari, I., et al.: Heritability and Genetic Correlations Along the Corticospinal Tract. International Workshop on Computational Diffusion MRI. Cham: Springer Nature Morocco, 2024](https://doi.org/10.1007/978-3-031-86920-4_18)
 * [Ba Gari, I., et al.: Along-tract parameterization of white matter microstructure using medial tractography analysis (MeTA). In: The 19th International Symposium on Medical Information Processing and Analysis (2023)](https://doi.org/10.1109/SIPAIM56729.2023.10373540)
 
-## Installation
 
-There are two options to use the package: via Conda or Docker/Singularity.
 
-### Conda Installation
+### Installation
+MeTA supports Python version >=3.11 and <3.14.
+Using **pip**:
+```sh
+pip install meta-neuro
+```
 
-Create an environment with Python version >=3.9 and <3.12. For example:
-
-```bash
+Using **Bioconda**:
+```sh
 conda config --add channels bioconda
-conda create -n meta python==3.13
-conda activate meta
-conda install bioconda::meta-neuro=2.0.1
+conda install bioconda::meta-neuro
 ```
 
-### Singularity Installation
-To pull the singularity image using apptainer:
-```bash
-apptainer pull meta_2_0_1.sif docker://quay.io/biocontainers/meta-neuro:2.0.1--py313h47f2c4e_0
+## Usage
 
-apptainer run meta_2_0_1.sif meta --help
-```
-> NOTE: Use `meta --help` to see the package options.
+```sh
+## Using DSI Studio transforms:
+# Compute density map and convert streamlines to a binary image:
+density_map --tractogram subject_CST.tt.gz --reference subject_FA.nii.gz \
+            --output "output_dir/subjectID_CST.nii.gz"
 
+# Medial Tractography Analysis (MeTA):
+meta --subject "subjectID_12345" --bundle "CST" \
+    --mbundle "model_CST.tt.gz" --sbundle "subject_CST.tt.gz" \
+    --mask "output_dir/subjectID_CST.nii.gz" \
+    --warp "subjectID.1InverseWarp.nii.gz" --warp_source "dsi_studio" \
+    --seg_method "hyperplane" --num_segments 15 --output "output_dir"
 
-## How to use the package:
+# Extract Voxel-based Bundle Profile: Compute volumetric profile for DTI maps e.g., FA, MD, RD, AD, etc. Output two files: 1) *_segments_average.csv file with the average profile along the bundle length, and 2) *_segments_voxelwise.h5 (with option `--voxelwise `): the profile for each voxel in the bundle.
+volumetric_profile --subject "subjectID_12345" --bundle "CST" --mask CST_local_all.nii.gz --map subject_FA.nii.gz --output "output_dir"
 
-### Generate Medial Surface for WM Bundle:
-Medial surface is extract based on Continuous medial representation (CMREP) method [Yushkevich, 2009](https://doi.org/10.1016/j.neuroimage.2008.10.051).
-* Convert streamlines in trk/tck/tt.gz formats to a binary image.
+# Extract Streamline-based Profile: Compute streamline profile based on tractography and DTI maps e.g., FA, MD, RD, AD, etc. output two files: 1) *_streamlines_average.csv file with the average profile along the bundle length, and 2) *_streamlines_pointwise.h5 (with option `--pointwise `): the profile for each point of streamline.
 
-```bash
-density_map --tractogram CST.trk --reference dti_FA.nii.gz --output CST.nii.gz
-```
+streamlines_profile --subject "subjectID_12345" --bundle "CST" --tractogram "subject_CST.tt.gz" --mask CST_local_all.nii.gz --map subject_FA.nii.gz --output "output_dir"
 
-* Generate a 3D Medial Surface for WM Bundle using the CMREP Method:
-
-```bash
-vtklevelset CST.nii.gz CST.vtk 0.1
-cmrep_vskel -c 3 -p 1.5 -g CST.vtk CST_skeleton.vtk
-```
+# Extract Bundle Shape Features: Bundle shape features implemented based on Yeh et al., 2020. The following features are extracted: Total number of streamlines, Average streamlines length, Span, Curl, Volume, Surface area, Diameter, Elongation, Irregularity
 
 
-### Run Medial Tractography Analysis (MeTA):
-MeTA will extract the core volume of WM bundle and parcellate it into segments along the bundle length.
-```bash
-meta --subject 1234 --bundle CST --medial_surface CST_skeleton.vtk --volume CST.vtk --sbundle CST.trk --mbundle CST_model.trk --transform subject_ANTs0GenericAffine.mat --mask CST.nii.gz --num_segments 15 --output CST
+shape_metrics --subject "subjectID_12345" --bundle "CST" --mask CST_local_all.nii.gz --tractogram "subject_CST.tt.gz" --output CST_streamlines_metrics.csv
 ```
 
+<!-- ```sh
+## Using ANTs transforms:
 
-### Extract Voxel-based Bundle Profile:
-Compute volumetric profile based on binary masks and microstructure maps e.g., FA, MD, RD, AD, etc. Output two files: 1) *_segments_average.csv file with the average profile along the bundle length, and 2) *_segments_voxelwise.h5: the profile for each voxel in the bundle.
-
-```bash
-volumetric_profile --subject 1234 --bundle CST --mask CST_local_all.nii.gz --map FA.nii.gz --output /output_folder
-```
-
-### Extract Streamline-based Profile:
-Compute streamline profile based on tractography and microstructure maps e.g., FA, MD, RD, AD, etc. output two files: 1) *_streamlines_average.csv file with the average profile along the bundle length, and 2) *_streamlines_pointwise.h5: the profile for each point of streamline.
-
-```bash
-streamlines_profile --subject 1234 --bundle CST --tractogram CST.trk --mask CST_local_all.nii.gz --map FA.nii.gz --output /output_folder
-```
-
-
-### Extract Bundle Shape Features:
-Bundle shape features implemented based on [Yeh et al., 2020](https://doi.org/10.1016/j.neuroimage.2020.117329). The following features are extracted:
-1. Total number of streamlines
-2. Average streamlines length
-3. Span
-4. Curl
-5. Volume
-6. Surface area
-7. Diameter
-8. Elongation
-9. Irregularity
-
-```bash
-shape_metrics --subject 1234 --bundle CST --mask CST.nii.gz --tractogram CST.trk --output CST_streamlines_metrics.csv
-```
+``` -->
