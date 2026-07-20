@@ -1,13 +1,2 @@
-build.sh
 meta.yaml
-meta_old.yaml
-Notes.sh
-conda_build_config.yaml
 .DS_Store
-Development
-README.html
-README_files
-meta.egg-info
-build
-bioconda-recipes
-test_build
