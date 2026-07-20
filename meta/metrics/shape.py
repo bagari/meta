@@ -8,15 +8,8 @@ import nibabel as nib
 from meta.io.streamline import read_streamlines
 from dipy.tracking.streamline import length
 
-
-logging.basicConfig(
-    stream=sys.stdout,
-    format='%(asctime)s,%(msecs)d [%(levelname)s] %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S',
-    encoding='utf-8',
-    level=logging.INFO,
-    force=True
-)
+logging.basicConfig(stream=sys.stdout, format='%(asctime)s,%(msecs)d [%(levelname)s] %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S', encoding='utf-8', level=logging.INFO, force=True)
 
 def bundle_length(streamlines):
     return np.mean([length(sl) for sl in streamlines])
@@ -27,13 +20,13 @@ def get_span(streamlines):
 def get_curl(streamlines):
     return (bundle_length(streamlines) / get_span(streamlines))
 
-def calculate_volume(img):
+def get_volume(img):
     data = img.get_fdata()
     voxel_dimensions = img.header.get_zooms()
     voxel_volume = np.prod(voxel_dimensions[:3]) or 1
     return (data > 0).sum() * voxel_volume
 
-def calculate_surface_area(img):
+def get_surface_area(img):
     data = img.get_fdata()
     voxel_dimensions = img.header.get_zooms()
     indices = np.where(data > 0)
@@ -46,13 +39,13 @@ def calculate_surface_area(img):
     return surface_voxels * voxel_area
 
 def get_diameter(streamlines, img):
-    return 2*np.sqrt(calculate_volume(img)/(np.pi*bundle_length(streamlines)))
+    return 2*np.sqrt(get_volume(img)/(np.pi*bundle_length(streamlines)))
 
 def get_elongation(streamlines, img):
     return bundle_length(streamlines) / get_diameter(streamlines, img)
 
 def get_irregularity(streamlines, img):
-    return calculate_surface_area(img) / (np.pi * get_diameter(streamlines, img) * bundle_length(streamlines))
+    return get_surface_area(img) / (np.pi * get_diameter(streamlines, img) * bundle_length(streamlines))
 
 
 ## Compute streamlines shape metrics:
@@ -77,8 +70,8 @@ def shape_features():
     streamlines_length = bundle_length(streamlines)
     span = get_span(streamlines)
     curl = get_curl(streamlines)
-    volume = calculate_volume(mask)
-    surface_area = calculate_surface_area(mask)
+    volume = get_volume(mask)
+    surface_area = get_surface_area(mask)
     diameter = get_diameter(streamlines, mask)
     elongation = get_elongation(streamlines, mask)
     irregularity = get_irregularity(streamlines, mask)

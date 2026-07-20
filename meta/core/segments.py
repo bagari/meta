@@ -2,14 +2,14 @@ import numpy as np
 from tqdm import tqdm
 
 
-def segment_bundle(bundle_data, dtw_points_sets, num_segments):
+def segment_bundle(bundle_data, corres_pts, num_segments):
     """
-    Parcellate white matter bundle into specified segments based on DTW points.
+    Parcellate white matter bundle into specified segments based on correspondence points.
 
     Parameters:
     -----------
     bundle_data: A binary mask of the white matter bundle as a NumPy array
-    dtw_points_sets: A list of arrays with shape (num_segments, 3) which are the corresponding DTW points.
+    corres_pts: A list of arrays with shape (num_segments, 3) containing correspondence points.
     num_segments: The required number of segments to divide the bundle into
 
     Returns:
@@ -17,58 +17,61 @@ def segment_bundle(bundle_data, dtw_points_sets, num_segments):
     segments: A list of labels, where each label corresponds to a segment.
     """
 
-    segments = [np.zeros_like(bundle_data, dtype=bool) for _ in range(num_segments+1)]
+    bundle_mask = bundle_data.astype(bool)
+    segments = [np.zeros_like(bundle_mask, dtype=bool) for _ in range(num_segments + 1)]
+    vox_coords = np.argwhere(bundle_mask)
 
-    for dtw_points in tqdm(dtw_points_sets):
+    for seg_pts in tqdm(corres_pts):
         for i in range(num_segments):
-
             if i == 0:
-                plane_normal = (dtw_points[i+1] - dtw_points[i]).astype(float)
-                for x, y, z in np.argwhere(bundle_data):
-                    point = np.array([x, y, z])
-                    if np.dot(point - dtw_points[i], -plane_normal) >= 0:
-                        segments[i][x, y, z] = True
+                plane_norm = (seg_pts[i + 1] - seg_pts[i]).astype(float)
+                mask = (vox_coords - seg_pts[i]) @ (-plane_norm) >= 0
+                segments[i][vox_coords[mask, 0], vox_coords[mask, 1], vox_coords[mask, 2]] = True
 
-            if i < num_segments - 2 and i >= 0:
-                plane_normal = (dtw_points[i+1] - dtw_points[i]).astype(float)
-                next_plane_normal = (dtw_points[i+1 + 1] - dtw_points[i+1]).astype(float)
-                for x, y, z in np.argwhere(bundle_data):
-                    point = np.array([x, y, z])
-                    if np.dot(point - dtw_points[i], plane_normal) >= 0 and np.dot(point - dtw_points[i+1], -next_plane_normal) >= 0:
-                        segments[i+1][x, y, z] = True
+            if 0 <= i < num_segments - 2:
+                plane_norm = (seg_pts[i + 1] - seg_pts[i]).astype(float)
+                next_norm = (seg_pts[i + 2] - seg_pts[i + 1]).astype(float)
+                mask = (((vox_coords - seg_pts[i]) @ plane_norm >= 0) & ((vox_coords - seg_pts[i + 1]) @ (-next_norm) >= 0))
+                segments[i + 1][vox_coords[mask, 0], vox_coords[mask, 1], vox_coords[mask, 2]] = True
 
             elif i == num_segments - 2: 
-                plane_normal = (dtw_points[i] - dtw_points[i-1]).astype(float)
-                for x, y, z in np.argwhere(bundle_data):
-                    point = np.array([x, y, z])
-                    if np.dot(point - dtw_points[i-1], plane_normal) >= 0:
-                        segments[i+1][x, y, z] = True
+                plane_norm = (seg_pts[i] - seg_pts[i - 1]).astype(float)
+                mask = (vox_coords - seg_pts[i - 1]) @ plane_norm >= 0
+                segments[i + 1][vox_coords[mask, 0], vox_coords[mask, 1], vox_coords[mask, 2]] = True
 
             elif i == num_segments - 1:
-                plane_normal = (dtw_points[i] - dtw_points[i-1]).astype(float)
-                for x, y, z in np.argwhere(bundle_data):
-                    point = np.array([x, y, z])
-                    if np.dot(point - dtw_points[i], plane_normal) >= 0:
-                        segments[i+1][x, y, z] = True
+                plane_norm = (seg_pts[i] - seg_pts[i - 1]).astype(float)
+                mask = (vox_coords - seg_pts[i]) @ plane_norm >= 0
+                segments[i + 1][vox_coords[mask, 0], vox_coords[mask, 1], vox_coords[mask, 2]] = True
 
-    arrays = np.array(segments)
-    sum_array = np.sum(arrays, axis=0)
-    remaining_voxels = sum_array.copy()
-    if np.any(remaining_voxels):
-        for x, y, z in np.argwhere(sum_array >= 2):
-            for seg in segments:
-                seg[x, y, z] = False
-            point = np.array([x, y, z])
-            min_distance = float('inf')
-            closest_segment_idx = None
-            for dtw_points in dtw_points_sets:
-                for i in range(num_segments):
-                    distance_to_start = np.linalg.norm(point - dtw_points[i])
-                    if distance_to_start < min_distance:
-                        min_distance = distance_to_start
-                        closest_segment_idx = i
-            if closest_segment_idx is not None:
-                segments[closest_segment_idx][x, y, z] = True    
+    seg_arr = np.array(segments)
+    seg_sum = np.sum(seg_arr, axis=0)
+
+    all_pts = np.vstack(corres_pts)
+    seg_idx = np.tile(np.arange(num_segments), len(corres_pts))
+
+    def assign_to_nearest(coords, chunk_size=25000):
+        """Assign each voxel coordinate to its nearest correspondence point."""
+        for start in range(0, len(coords), chunk_size):
+            chunk = coords[start:start + chunk_size]
+            diff = chunk[:, np.newaxis, :] - all_pts[np.newaxis, :, :]
+            dists = np.linalg.norm(diff, axis=2)
+            closest = seg_idx[np.argmin(dists, axis=1)]
+
+            for idx in range(num_segments):
+                winners = chunk[closest == idx]
+                if len(winners) > 0:
+                    segments[idx][winners[:, 0], winners[:, 1], winners[:, 2]] = True
+
+    conflict_coords = np.argwhere(seg_sum >= 2)
+    if len(conflict_coords) > 0:
+        for seg in segments:
+            seg[conflict_coords[:, 0], conflict_coords[:, 1], conflict_coords[:, 2]] = False
+        assign_to_nearest(conflict_coords)
+
+    missing_coords = np.argwhere((seg_sum == 0) & bundle_mask)
+    if len(missing_coords) > 0:
+        assign_to_nearest(missing_coords)
+
     return segments
-
 

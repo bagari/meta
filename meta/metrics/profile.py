@@ -8,15 +8,8 @@ from scipy.ndimage import map_coordinates
 from meta.io.streamline import read_streamlines
 from dipy.tracking.streamline import transform_streamlines
 
-
-logging.basicConfig(
-    stream=sys.stdout,
-    format='%(asctime)s,%(msecs)d [%(levelname)s] %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S',
-    encoding='utf-8',
-    level=logging.INFO,
-    force=True
-)
+logging.basicConfig(stream=sys.stdout, format='%(asctime)s,%(msecs)d [%(levelname)s] %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S', encoding='utf-8', level=logging.INFO, force=True)
 
 ## Compute bundle features based on binary masks and microstructure maps
 def volumetric_profile():

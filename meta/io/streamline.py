@@ -4,22 +4,18 @@ import gzip
 import logging
 import numpy as np
 import scipy.io as sio
+
 import nibabel as nib
 from nibabel.streamlines import Tractogram
 from nibabel.streamlines.trk import TrkFile
 from nibabel.streamlines.tck import TckFile
+
+import trx.trx_file_memmap as tmm
 from dipy.io.streamline import load_tractogram
-from dipy.tracking.streamline import transform_streamlines
+from dipy.tracking.streamline import transform_streamlines, Streamlines
 
-logging.basicConfig(
-    stream=sys.stdout,
-    format='%(asctime)s,%(msecs)d [%(levelname)s] %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S',
-    encoding='utf-8',
-    level=logging.INFO,
-    force=True
-)
-
+logging.basicConfig(stream=sys.stdout, format='%(asctime)s,%(msecs)d [%(levelname)s] %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S', encoding='utf-8', level=logging.INFO, force=True)
 
 def parse_tt(tinytrack):
     """
@@ -39,7 +35,7 @@ def parse_tt(tinytrack):
     if tinytrack.endswith('.tt.gz'):
         with gzip.open(tinytrack, 'rb') as f:
             data = f.read()
-        mat = sio.loadmat(io.BytesIO(data), appendmat=False, spmatrix=False)
+        mat = sio.loadmat(io.BytesIO(data), appendmat=False)
     tt_affine = mat['trans_to_mni'].reshape(4,4)
     dimension = tuple(mat['dimension'].ravel().astype(int))
     voxel_size = tuple(mat['voxel_size'].ravel().astype(float))
@@ -82,9 +78,9 @@ def parse_tt(tinytrack):
     return streamlines, tt_affine, dimension, voxel_size, voxel_order
 
 
-def read_streamlines(bundle_path, reference=None, transform=None):
+def read_streamlines(bundle_path, reference=None):
     """
-    Read streamlines from a bundle file, supporting TRK, TCK, TRX and TinyTrack formats.
+    Read streamlines from TRK, TCK, TRX, or TinyTrack format.
     
     Parameters:
         bundle_path: Path to segmented white matter bundle file.
@@ -92,26 +88,35 @@ def read_streamlines(bundle_path, reference=None, transform=None):
     Returns:
         streamlines: List of streamlines in RASMM space.
     """
+    ## TCK format:
     if bundle_path.endswith('.tck'):
         bundle = load_tractogram(bundle_path, reference, bbox_valid_check=False)
         streamlines = bundle.streamlines
-        if transform is not None:
-            streamlines = transform_streamlines(streamlines, transform)
+        groups = getattr(bundle, "groups", {})
+        affine = getattr(bundle, "affine", np.eye(4))
+        dimension = getattr(bundle, "dimensions", None)
 
-        groups = bundle.groups if hasattr(bundle, 'groups') else {}
-        affine = bundle.affine if hasattr(bundle, 'affine') else np.eye(4)
-        dimension = bundle.dimensions if hasattr(bundle, 'dimensions') else None
         return streamlines, groups, affine, dimension
 
-    if bundle_path.endswith(('.trk', '.trx')):
+    ## TRK format:
+    if bundle_path.endswith(('.trk')):
         bundle =  load_tractogram(bundle_path, "same", bbox_valid_check=False)
         streamlines = bundle.streamlines
-        if transform is not None:
-            streamlines = transform_streamlines(streamlines, transform)
+        groups = getattr(bundle, "groups", {})
+        affine = getattr(bundle, "affine", np.eye(4))
+        dimension = getattr(bundle, "dimensions", None)
 
-        groups = bundle.groups if hasattr(bundle, 'groups') else {}
-        affine = bundle.affine if hasattr(bundle, 'affine') else np.eye(4)
-        dimension = bundle.dimensions if hasattr(bundle, 'dimensions') else None
+        return streamlines, groups, affine, dimension
+
+    ## TRX format:
+    if bundle_path.endswith(('.trx')):
+        print("Loading .trx bundle...") 
+        bundle = tmm.load(bundle_path)
+        streamlines = bundle.streamlines
+        groups = getattr(bundle, "groups", {})
+        affine = getattr(bundle, "affine", np.eye(4))
+        dimension = getattr(bundle, "dimensions", None)
+
         return streamlines, groups, affine, dimension
 
     if bundle_path.endswith('.tt.gz'):
@@ -119,24 +124,23 @@ def read_streamlines(bundle_path, reference=None, transform=None):
         streamlines, tt_affine, dimension, _, _ = parse_tt(bundle_path)
         streamlines_lps_center = [s - 0.5 for s in streamlines]
         streamlines = transform_streamlines(streamlines_lps_center, tt_affine)
-        if transform is not None:
-            streamlines = transform_streamlines(streamlines, transform)
-
+        streamlines = Streamlines(streamlines)
         groups = {}
         affine = tt_affine
-        dimension = dimension
+        dimension = tuple(dimension) if dimension is not None else None
+
         return streamlines, groups, affine, dimension
     
-    raise ValueError(f"Only .trk, .tck, .tt.gz are supported")
+    raise ValueError(f"Supported formats: .trk, .tck, .trx, .tt.gz")
 
 
-def convert_tinytrack_to_trk_tck(bundle_path, format='trk'):
+def convert_tinytrack(bundle_path, output_format='trk'):
     """
     Convert TinyTrack (.tt.gz) to TRK or TCK format.
 
     Args:
         bundle_path: Path to segmented white matter bundle file in TinyTrack format.
-        format: Output format, either 'trk' or 'tck'.
+        output_format: Output format, either 'trk' or 'tck'.
     """
 
     if bundle_path.endswith('.tt.gz'):
@@ -149,7 +153,7 @@ def convert_tinytrack_to_trk_tck(bundle_path, format='trk'):
     streamlines_lps_center = [s - 0.5 for s in streamlines]
     tractogram = Tractogram(streamlines_lps_center, affine_to_rasmm=tt_affine)
 
-    if format == 'tck':
+    if output_format == 'tck':
         tck = TckFile(tractogram=tractogram)
         tck.save(f'{output}.tck')
     else:
