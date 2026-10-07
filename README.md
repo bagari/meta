@@ -1,3 +1,4 @@
+[![PyPI](https://img.shields.io/pypi/v/meta-neuro?label=PyPI)](https://pypi.org/project/meta-neuro/)
 ![GitHub release (latest by date)](https://img.shields.io/github/v/release/bagari/meta?logo=Github)
 [![install with bioconda](https://img.shields.io/badge/install%20with-bioconda-brightgreen.svg?style=flat)](http://bioconda.github.io/recipes/meta-neuro/README.html)
 ![Platforms](https://anaconda.org/bioconda/meta-neuro/badges/platforms.svg)
