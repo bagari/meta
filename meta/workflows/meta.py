@@ -29,7 +29,7 @@ def main():
     parser.add_argument("--mbundle", type=str, help='Streamlines of model bundle', required=True)
     parser.add_argument("--sbundle", type=str, help='Streamlines of subject bundle', required=True)
     parser.add_argument("--mask", type=str, help='Mask of subject white matter bundle', required=True)
-    parser.add_argument("--percent", type=float, help='Percent of distance to keep from each side of Medial surface' , default=0.125)
+    parser.add_argument("--percent", type=float, help='Fraction of the medial-to-boundary distance keep on each side (e.g., 0.125 = 12.5%).' , default=0.125)
     parser.add_argument("--save_medial", action='store_true', help='Save the boundary mesh and medial surface (.vtk) to the output dir')
     parser.add_argument("--level", type=float, default=0.1, help='Iso-surface level for the boundary mesh (marching cubes)')
     parser.add_argument("--prune", type=float, default=1.5, help='Geodesic/Euclidean pruning factor for the medial surface')
