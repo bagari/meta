@@ -53,6 +53,9 @@ meta --subject "subjectID_12345" --bundle "CST" \
 # Extract Voxel-based Bundle Profile: Compute volumetric profile for DTI maps e.g., FA, MD, RD, AD, etc. Output two files: 1) *_segments_average.csv file with the average profile along the bundle length, and 2) *_segments_voxelwise.h5 (with option `--voxelwise `): the profile for each voxel in the bundle.
 volumetric_profile --subject "subjectID_12345" --bundle "CST" --mask CST_local_all.nii.gz --map subject_FA.nii.gz --output "output_dir"
 
+# Several maps and masks in one call (each file is loaded once): outputs are named <subject>_<bundle>_<map>_segments_average_<mask>.csv, e.g. subjectID_12345_CST_fa_segments_average_local_all.csv
+volumetric_profile --subject "subjectID_12345" --bundle "CST" --mask local_all=CST_local_all.nii.gz local_core=CST_local_core.nii.gz --map fa=subject_FA.nii.gz md=subject_MD.nii.gz --output "output_dir"
+
 # Extract Streamline-based Profile: Compute streamline profile based on tractography and DTI maps e.g., FA, MD, RD, AD, etc. output two files: 1) *_streamlines_average.csv file with the average profile along the bundle length, and 2) *_streamlines_pointwise.h5 (with option `--pointwise `): the profile for each point of streamline.
 
 streamlines_profile --subject "subjectID_12345" --bundle "CST" --tractogram "subject_CST.tt.gz" --mask CST_local_all.nii.gz --map subject_FA.nii.gz --output "output_dir"

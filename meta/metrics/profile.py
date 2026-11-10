@@ -1,3 +1,5 @@
+import os
+import re
 import sys
 import logging
 import argparse
@@ -11,13 +13,36 @@ from dipy.tracking.streamline import transform_streamlines
 logging.basicConfig(stream=sys.stdout, format='%(asctime)s,%(msecs)d [%(levelname)s] %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S', encoding='utf-8', level=logging.INFO, force=True)
 
+def named_paths(values):
+    # name=path pairs; a plain path is named after its file, without .nii or .nii.gz.
+    return dict(v.split('=', 1) if '=' in v else (re.sub(r'\.nii(\.gz)?$', '', os.path.basename(v)), v) for v in values)
+
+
+def segment_profile(micro_map, labels, subject, bundle, voxelwise=False):
+    # Mean of the non-zero map values in each mask label, and optionally every voxel value.
+    means = {'segment': [], 'mean': []}
+    voxels = {'segment': [], 'value': []}
+    for label in np.unique(labels):
+        label = int(label)
+        if label == 0:
+            continue
+        in_label = labels == label
+        means['segment'].append(label)
+        means['mean'].append(np.nanmean(micro_map[in_label & (micro_map != 0)]))
+        if voxelwise:
+            voxels['segment'].extend([label] * int(in_label.sum()))
+            voxels['value'].extend(micro_map[in_label])
+    return (pd.DataFrame({'subjectID': subject, 'bundle': bundle, **means}),
+            pd.DataFrame({'subjectID': subject, 'bundle': bundle, **voxels}))
+
+
 ## Compute bundle features based on binary masks and microstructure maps
 def volumetric_profile():
-    parser = argparse.ArgumentParser(description='Compute volumetric profile (average mean and voxel-wise) of a white matter bundle.')
+    parser = argparse.ArgumentParser(description='Compute volumetric profiles (segment means and, optionally, voxel values) of a white matter bundle for one or more maps and masks.')
     parser.add_argument('--subject', type=str, help='Subject ID', required=True)
     parser.add_argument('--bundle', type=str, help='White matter bundle name', required=True)
-    parser.add_argument('--mask', type=str, help='Path to white matter bundle mask', required=True)
-    parser.add_argument('--map', type=str, help='Brain microstructure map, e.g. FA, MD, etc.', required=True)
+    parser.add_argument('--mask', type=str, nargs='+', help='White matter bundle mask(s) or label image(s), as path or name=path, e.g. local_all=CST_local_all.nii.gz', required=True)
+    parser.add_argument('--map', type=str, nargs='+', help='Brain microstructure map(s), as path or name=path, e.g. fa=subject_FA.nii.gz', required=True)
     parser.add_argument('--output', type=str, help='Output directory to save extracted features', required=True)
     parser.add_argument('--voxelwise', action='store_true', help='Save voxel-wise in HDF5 format')
 
@@ -26,60 +51,37 @@ def volumetric_profile():
         return
     args = parser.parse_args()
 
-    try:
-        features = {
-            'subjectID': [],
-            'bundle': [],
-            'segment': [],
-            'mean': []
-        }
-        
-        voxel_features = {
-            'subjectID': [],
-            'bundle': [],
-            'segment': [],
-            'value': []
-        }
+    maps, masks = named_paths(args.map), named_paths(args.mask)
+    if len(maps) < len(args.map) or len(masks) < len(args.mask):
+        parser.error('--map and --mask names must be unique.')
 
-        # Load the mask and microstructure map
-        micro_map = nib.load(args.map).get_fdata()
-        data = nib.load(args.mask).get_fdata()
+    # One unnamed map and mask keep the original file names; otherwise the map and mask names are added.
+    single = len(args.map) == len(args.mask) == 1 and '=' not in args.map[0] + args.mask[0]
+    def output_path(map_name, mask_name, kind, ext):
+        name = f'segments_{kind}' if single else f'{map_name}_segments_{kind}_{mask_name}'
+        return f'{args.output}/{args.subject}_{args.bundle}_{name}.{ext}'
 
-        labels = np.unique(data)
-        for label in labels:
-            label = int(label)
-            if label == 0:
-                continue
+    # Load each mask and map once; a failed map is reported after the others are profiled.
+    mask_data = {name: nib.load(path).get_fdata() for name, path in masks.items()}
+    failed = []
+    for map_name, map_path in maps.items():
+        try:
+            micro_map = nib.load(map_path).get_fdata()
+            for mask_name, labels in mask_data.items():
+                mean_df, voxel_df = segment_profile(micro_map, labels, args.subject, args.bundle, args.voxelwise)
+                csv_path = output_path(map_name, mask_name, 'average', 'csv')
+                mean_df.to_csv(csv_path, index=False)
+                logging.info(f"Saved segment-wise mean features to {csv_path}")
+                if args.voxelwise:
+                    hdf5_path = output_path(map_name, mask_name, 'voxelwise', 'h5')
+                    voxel_df.to_hdf(hdf5_path, key='df', mode='w', complevel=9)
+                    logging.info(f"Saved voxel-wise features to {hdf5_path}")
+        except Exception as e:
+            logging.error(f'An error occurred while processing {map_path}: {str(e)}')
+            failed.append(map_name)
 
-            ## Compute mean for a label of microstructure map
-            mean_value = np.nanmean(micro_map[(data == label) & (micro_map != 0)])
-            features['subjectID'].append(args.subject)
-            features['bundle'].append(args.bundle)
-            features['segment'].append(label)
-            features['mean'].append(mean_value)
-
-            ## Add the voxel-wise values of the microstructure map:
-            voxel_features['subjectID'].extend([args.subject]*np.sum(data == label))
-            voxel_features['bundle'].extend([args.bundle]*np.sum(data == label))
-            voxel_features['segment'].extend([label]*np.sum(data == label))
-            voxel_features['value'].extend(micro_map[data == label])
-
-        mean_df = pd.DataFrame(features)
-        csv_path = f"{args.output}/{args.subject}_{args.bundle}_segments_average.csv"
-        mean_df.to_csv(csv_path, index=False)
-        logging.info(f"Saved segment-wise mean features to {csv_path}")
-
-        if args.voxelwise:
-            ## Save the voxel-wise features to HDF5:
-            voxel_wise_df = pd.DataFrame(voxel_features)
-            hdf5_path = f"{args.output}/{args.subject}_{args.bundle}_segments_voxelwise.h5"
-            voxel_wise_df.to_hdf(hdf5_path, key='df', mode='w', complevel=9)
-            logging.info(f"Saved voxel-wise features to {hdf5_path}")
-        else:
-            logging.info("Skipping saving voxel-wise features as --voxelwise not set to True")
-
-    except Exception as e:
-        logging.error(f'An error occurred while processing {args.mask}: {str(e)}')
+    if failed:
+        sys.exit(f"Failed to profile map(s): {', '.join(failed)}")
 
 
 def streamlines_profile():

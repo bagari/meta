@@ -1,5 +1,15 @@
 # Changelog
 
+### [2.2.0] - 2026-11-09
+
+**Volumetric profiles**
+- `volumetric_profile` accepts several `--map` and `--mask` values, as `path` or `name=path`, and loads each file once.
+- With several maps or masks, outputs are named `<subject>_<bundle>_<map>_segments_average_<mask>.csv` (and `..._segments_voxelwise_<mask>.h5`); one unnamed map and mask keep the original names.
+- Exits with an error after profiling the other maps if any map fails, instead of only logging it.
+- Collects voxel-wise values only when `--voxelwise` is set.
+
+---
+
 ### [2.1.0] - 2026-07-20
 
 **Highlights**
